@@ -25,7 +25,7 @@ gmf_config = {'alias': 'gmf_factor8neg4-implict',
               'l2_regularization': 0, # 0.01
               'use_cuda': False,
               'device_id': 0,
-              'model_dir':'checkpoints/{}_Epoch{}_HR{:.4f}_NDCG{:.4f}.model'}
+              'model_dir':'checkpoints/gmf.model'}
 
 mlp_config = {'alias': 'mlp_factor8neg4_bz256_166432168_pretrain_reg_0.0000001',
               'num_epoch': 100,
@@ -41,8 +41,8 @@ mlp_config = {'alias': 'mlp_factor8neg4_bz256_166432168_pretrain_reg_0.0000001',
               'use_cuda': False,
               'device_id': 7,
               'pretrain': True,
-              'pretrain_mf': 'checkpoints/{}'.format('gmf_factor8neg4-implict_Epoch99_HR1.0000_NDCG0.6184.model'),
-              'model_dir':'checkpoints/{}_Epoch{}_HR{:.4f}_NDCG{:.4f}.model'}
+              'pretrain_mf': 'checkpoints/{}'.format('gmf.model'),
+              'model_dir':'checkpoints/mlp.model'}
 
 neumf_config = {'alias': 'pretrain_neumf_factor8neg4',
                 'num_epoch': 100,
@@ -59,9 +59,9 @@ neumf_config = {'alias': 'pretrain_neumf_factor8neg4',
                 'use_cuda': False,
                 'device_id': 7,
                 'pretrain': True,
-                'pretrain_mf': 'checkpoints/{}'.format('gmf_factor8neg4-implict_Epoch99_HR1.0000_NDCG0.6184.model'),
-                'pretrain_mlp': 'checkpoints/{}'.format('mlp_factor8neg4_bz256_166432168_pretrain_reg_0.0000001_Epoch99_HR1.0000_NDCG0.6846.model'),
-                'model_dir':'checkpoints/{}_Epoch{}_HR{:.4f}_NDCG{:.4f}.model'
+                'pretrain_mf': 'checkpoints/{}'.format('gmf.model'),
+                'pretrain_mlp': 'checkpoints/{}'.format('mlp.model'),
+                'model_dir':'checkpoints/neumf.model'
                 }
 
 # Load Data
@@ -87,13 +87,19 @@ print('Range of itemId is [{}, {}]'.format(ml1m_rating.itemId.min(), ml1m_rating
 # DataLoader for training
 sample_generator = SampleGenerator(ratings=ml1m_rating)
 evaluate_data = sample_generator.evaluate_data
-#Specify the exact model
-#config = gmf_config
-#engine = GMFEngine(config)
-#config = mlp_config
-#engine = MLPEngine(config)
-config = neumf_config
-engine = NeuMFEngine(config)
+
+choice = 0
+
+if choice == 0:
+  config = gmf_config
+  engine = GMFEngine(config)
+elif choice == 1:
+  config = mlp_config
+  engine = MLPEngine(config)
+elif choice == 2:
+  config = neumf_config
+  engine = NeuMFEngine(config)
+  
 for epoch in range(config['num_epoch']):
     print('Epoch {} starts !'.format(epoch))
     print('-' * 80)
