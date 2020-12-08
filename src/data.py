@@ -89,7 +89,7 @@ class SampleGenerator(object):
         normal = normal[normal.duplicated(subset=['userId'], keep=False)]
         impressed = impressed[impressed.duplicated(subset=['userId'], keep=False)]
         """
-        ratings = ratings[ratings.duplicated(subset=['userId', 'timestamp'], keep=False)]
+        ratings = ratings[ratings.duplicated(subset=['userId'], keep=False)]
         ratings['rank_latest'] = ratings.groupby(['userId'])['timestamp'].rank(method='first', ascending=False)
         test = ratings[ratings['rank_latest'] == 1]
         train = ratings[ratings['rank_latest'] > 1]
