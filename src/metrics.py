@@ -45,6 +45,18 @@ class MetronAtK(object):
     def cal_hit_ratio(self):
         """Hit Ratio @ top_K"""
         full, top_k = self._subjects, self._top_k
+        print("full")
+        print(full[full["user"] == 0])
+        top_k = full[full['rank']<=top_k]
+        test_in_top_k =top_k[top_k['test_item'] == top_k['item']]  # golden items hit in the top_K items
+        print("result")
+        print(test_in_top_k)
+        test_in_top_k.to_csv("output.csv", header=None, index=None, sep = ",")
+        return len(test_in_top_k) * 1.0 / full['user'].nunique()
+
+    def cal_mrr(self):
+        """Hit Ratio @ top_K"""
+        full, top_k = self._subjects, self._top_k
         top_k = full[full['rank']<=top_k]
         test_in_top_k =top_k[top_k['test_item'] == top_k['item']]  # golden items hit in the top_K items
         return len(test_in_top_k) * 1.0 / full['user'].nunique()
