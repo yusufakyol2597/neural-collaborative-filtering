@@ -3,6 +3,8 @@ import random
 import pandas as pd
 from copy import deepcopy
 from torch.utils.data import DataLoader, Dataset
+import sys
+import ast
 
 random.seed(0)
 
@@ -35,8 +37,8 @@ class SampleGenerator(object):
             ratings: pd.DataFrame, which contains 4 columns = ['userId', 'itemId', 'rating', 'timestamp']
         """
         assert 'userId' in ratings.columns
-        assert 'itemId' in ratings.columns
         assert 'rating' in ratings.columns
+        assert 'itemId' in ratings.columns
 
         self.ratings = ratings
         # explicit feedback using _normalize and implicit using _binarize
@@ -44,6 +46,22 @@ class SampleGenerator(object):
         self.preprocess_ratings = self._binarize(ratings)
         self.user_pool = set(self.ratings['userId'].unique())
         self.item_pool = set(self.ratings['itemId'].unique())
+
+        self.item_dict = {}
+        for row in self.ratings.itertuples():
+            self.item_dict[row.mid] = row.itemId
+        '''
+        items = self.ratings['itemId'].unique().tolist()
+
+        for row in ratings.itertuples():
+            for item in row.impressions.split("|"):
+                if item not in items:
+                    items.append(item)
+        print("Length of items")
+        print(len(items)
+        self.item_pool = set(items)
+        '''
+
         # create negative item samples for NCF learning
         self.negatives = self._sample_negative(ratings)
         self.train_ratings, self.test_ratings = self._split_loo(self.preprocess_ratings)
@@ -54,7 +72,7 @@ class SampleGenerator(object):
         max_rating = ratings.rating.max()
         ratings['rating'] = ratings.rating * 1.0 / max_rating
         return ratings
-    
+
     def _binarize(self, ratings):
         """binarize into 0 or 1, imlicit feedback"""
         ratings = deepcopy(ratings)
@@ -63,19 +81,35 @@ class SampleGenerator(object):
 
     def _split_loo(self, ratings):
         """leave one out train/test split """
+        """
+        normal = ratings[ratings.is_test == 0]
+        impressed = ratings[ratings.is_test == 1]
+
+        print(impressed)
+        normal = normal[normal.duplicated(subset=['userId'], keep=False)]
+        impressed = impressed[impressed.duplicated(subset=['userId'], keep=False)]
+        """
+        ratings = ratings[ratings.duplicated(subset=['userId', 'timestamp'], keep=False)]
         ratings['rank_latest'] = ratings.groupby(['userId'])['timestamp'].rank(method='first', ascending=False)
         test = ratings[ratings['rank_latest'] == 1]
         train = ratings[ratings['rank_latest'] > 1]
+
+        self.item_pool = set(train.append(test)['itemId'].unique())
+        self.user_pool = set(train.append(test)['userId'].unique())
+
         assert train['userId'].nunique() == test['userId'].nunique()
-        return train[['userId', 'itemId', 'rating']], test[['userId', 'itemId', 'rating']]
+        return train[['userId', 'itemId', 'rating']], test[['userId', 'itemId', 'rating', 'impressions', 'mid']]
 
     def _sample_negative(self, ratings):
         """return all negative items & 100 sampled negative items"""
         interact_status = ratings.groupby('userId')['itemId'].apply(set).reset_index().rename(
             columns={'itemId': 'interacted_items'})
+
         interact_status['negative_items'] = interact_status['interacted_items'].apply(lambda x: self.item_pool - x)
-        interact_status['negative_samples'] = interact_status['negative_items'].apply(lambda x: random.sample(x, 99))
-        return interact_status[['userId', 'negative_items', 'negative_samples']]
+        interact_status['negative_samples'] = interact_status['negative_items'].apply(lambda x: random.sample(x, 5))
+        #interact_status['negative_samples'] = ratings['impressions'].apply(lambda x: x.split("|"))
+        result = interact_status[['userId', 'negative_items', 'negative_samples']]
+        return result
 
     def instance_a_train_loader(self, num_negatives, batch_size):
         """instance train loader for one training epoch"""
@@ -83,13 +117,15 @@ class SampleGenerator(object):
         train_ratings = pd.merge(self.train_ratings, self.negatives[['userId', 'negative_items']], on='userId')
         train_ratings['negatives'] = train_ratings['negative_items'].apply(lambda x: random.sample(x, num_negatives))
         for row in train_ratings.itertuples():
-            users.append(int(row.userId))
-            items.append(int(row.itemId))
-            ratings.append(float(row.rating))
-            for i in range(num_negatives):
+            if int(row.itemId) in self.item_pool and int(row.userId) in self.user_pool:
                 users.append(int(row.userId))
-                items.append(int(row.negatives[i]))
-                ratings.append(float(0))  # negative samples get 0 rating
+                items.append(int(row.itemId))
+                ratings.append(float(row.rating))
+                for i in range(num_negatives):
+                    if int(row.negatives[i]) in self.item_pool:
+                        users.append(int(row.userId))
+                        items.append(int(row.negatives[i]))
+                        ratings.append(float(0))  # negative samples get 0 rating
         dataset = UserItemRatingDataset(user_tensor=torch.LongTensor(users),
                                         item_tensor=torch.LongTensor(items),
                                         target_tensor=torch.FloatTensor(ratings))
@@ -99,12 +135,33 @@ class SampleGenerator(object):
     def evaluate_data(self):
         """create evaluate data"""
         test_ratings = pd.merge(self.test_ratings, self.negatives[['userId', 'negative_samples']], on='userId')
+        #print(test_ratings)
         test_users, test_items, negative_users, negative_items = [], [], [], []
+        """
         for row in test_ratings.itertuples():
             test_users.append(int(row.userId))
             test_items.append(int(row.itemId))
-            for i in range(len(row.negative_samples)):
-                negative_users.append(int(row.userId))
-                negative_items.append(int(row.negative_samples[i]))
+            if row.impressions == '0':
+                for i in range(len(row.negative_samples)):
+                    negative_users.append(int(row.userId))
+                    negative_items.append(int(row.negative_samples[i]))
+            else:
+                for item in ast.literal_eval(row.impressions):
+                    if int(item) != row.itemId and int(item) in self.item_pool:
+                        negative_users.append(int(row.userId))
+                        negative_items.append(int(item))
+        """
+        for row in test_ratings.itertuples():
+            if int(row.itemId) in self.item_pool and int(row.userId) in self.user_pool:
+                test_users.append(int(row.userId))
+                test_items.append(int(row.itemId))
+                for item in ast.literal_eval(row.impressions):
+                    if int(item) in self.item_dict:
+                        item_id = self.item_dict[int(item)]
+                        if int(item_id) != row.itemId and int(item_id) in self.item_pool:
+                            negative_users.append(int(row.userId))
+                            negative_items.append(item_id)
+        #print(negative_items)
+        #sys.exit()
         return [torch.LongTensor(test_users), torch.LongTensor(test_items), torch.LongTensor(negative_users),
                 torch.LongTensor(negative_items)]
