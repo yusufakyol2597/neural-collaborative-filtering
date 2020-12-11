@@ -82,12 +82,6 @@ class SampleGenerator(object):
     def _split_loo(self, ratings):
         """leave one out train/test split """
         """
-        normal = ratings[ratings.is_test == 0]
-        impressed = ratings[ratings.is_test == 1]
-
-        print(impressed)
-        normal = normal[normal.duplicated(subset=['userId'], keep=False)]
-        impressed = impressed[impressed.duplicated(subset=['userId'], keep=False)]
         """
         ratings = ratings[ratings.duplicated(subset=['userId'], keep=False)]
         ratings['rank_latest'] = ratings.groupby(['userId'])['timestamp'].rank(method='first', ascending=False)
