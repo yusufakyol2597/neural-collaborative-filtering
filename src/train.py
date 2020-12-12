@@ -74,14 +74,10 @@ ml1m_rating = pd.read_csv(ml1m_dir, sep=':', header=None, names=['uid', 'mid', '
 user_id = ml1m_rating[['uid']].drop_duplicates().reindex()
 user_id['userId'] = np.arange(len(user_id))
 ml1m_rating = pd.merge(ml1m_rating, user_id, on=['uid'], how='left')
-item_id = ml1m_rating[['mid']]
+item_id = ml1m_rating[['mid']].drop_duplicates()
 item_id['itemId'] = np.arange(len(item_id))
 ml1m_rating = pd.merge(ml1m_rating, item_id, on=['mid'], how='left')
-#item_id['itemId'] = item_id['mid'].apply(lambda x: int(x))
-#ml1m_rating = pd.merge(ml1m_rating, item_id, on=['mid'], how='left')
-#ml1m_rating = pd.merge(ml1m_rating, item_id, on=['mid'], how='left')
 ml1m_rating = ml1m_rating[['userId', 'itemId', 'rating', 'timestamp', 'impressions', 'is_test', 'mid']]
-#print(ml1m_rating)
 print('Range of userId is [{}, {}]'.format(ml1m_rating.userId.min(), ml1m_rating.userId.max()))
 print('Range of itemId is [{}, {}]'.format(ml1m_rating.itemId.min(), ml1m_rating.itemId.max()))
 # DataLoader for training
